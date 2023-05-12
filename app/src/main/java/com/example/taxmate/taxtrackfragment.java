@@ -15,6 +15,13 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
+import java.util.Map;
+
 public class taxtrackfragment extends Fragment {
 
     private static final String ARG_PARAM1 = "param1";
@@ -121,6 +128,39 @@ public class taxtrackfragment extends Fragment {
 
                 taxResultTextView.setText(result1Text);
                 tax2ResultTextView.setText(result2Text);
+
+                FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                if (user != null) {
+                    FirebaseFirestore db = FirebaseFirestore.getInstance();
+                    Map<String, Object> taxData = new HashMap<>();
+                    taxData.put("age", age);
+                    taxData.put("salary", salary);
+                    taxData.put("hra", hra);
+                    taxData.put("lta", lta);
+                    taxData.put("savingsDepositInterest", savingsDepositInterest);
+                    taxData.put("otherAllowances", otherAllowances);
+                    taxData.put("sec80c", sec80c);
+                    taxData.put("medInsurance", medInsurance);
+                    taxData.put("eduLoanInterest", eduLoanInterest);
+                    taxData.put("homeLoanInterest", homeLoanInterest);
+                    taxData.put("evLoanInterest", evLoanInterest);
+                    taxData.put("charityDonations", charityDonations);
+                    taxData.put("npsContributions", npsContributions);
+                    taxData.put("otherDeductions", otherDeductions);
+                    taxData.put("taxLiabilityFY22", taxLiabilityFY22);
+                    taxData.put("taxLiabilityFY23", taxLiabilityFY23);
+                    Integer totalIncome = salary + hra + lta + savingsDepositInterest + otherAllowances;
+                    taxData.put("totalTaxableIncomeFY22", totalIncome - sec80c - medInsurance - homeLoanInterest - eduLoanInterest - evLoanInterest - charityDonations - npsContributions - otherDeductions);
+                    taxData.put("totalTaxableIncomeFY23", totalIncome);
+
+                    db.collection("users").document(user.getUid())
+                            .set(taxData)
+                            .addOnSuccessListener(aVoid -> Toast.makeText(getActivity(), "Data successfully written!", Toast.LENGTH_SHORT).show())
+                            .addOnFailureListener(e -> Toast.makeText(getActivity(), "Error writing document", Toast.LENGTH_SHORT).show());
+                } else {
+                    Toast.makeText(getActivity(), "No user signed in", Toast.LENGTH_SHORT).show();
+                }
+
             }
         });
     }
