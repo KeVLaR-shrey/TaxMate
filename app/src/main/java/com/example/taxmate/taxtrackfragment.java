@@ -1,12 +1,24 @@
-
 package com.example.taxmate;
 
+import static android.content.ContentValues.TAG;
+
+import android.content.Intent;
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
+
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.DocumentReference;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,14 +27,13 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
-
 import java.util.HashMap;
 import java.util.Map;
 
 public class taxtrackfragment extends Fragment {
+
+    private FirebaseAuth mAuth;  // Firebase Auth instance
+    private FirebaseFirestore db; // Firebase Firestore instance
 
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
@@ -64,6 +75,9 @@ public class taxtrackfragment extends Fragment {
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        mAuth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
+
         Button calculateButton = view.findViewById(R.id.calculate_button);
         EditText ageText = view.findViewById(R.id.age_edit_text);
         EditText salarytext = view.findViewById(R.id.salary_edit_text);
@@ -79,7 +93,7 @@ public class taxtrackfragment extends Fragment {
         EditText charityDonationstext = view.findViewById(R.id.donation_edit_text);
         EditText npsContributionstext = view.findViewById(R.id.nps);
         EditText otherDeductionstext = view.findViewById(R.id.otherdeduct_edit_text);
-        EditText resultEditText = view.findViewById(R.id.recom);
+        TextView resultEditText = view.findViewById(R.id.recom);
 
         calculateButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -129,41 +143,62 @@ public class taxtrackfragment extends Fragment {
                 taxResultTextView.setText(result1Text);
                 tax2ResultTextView.setText(result2Text);
 
-                FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-                if (user != null) {
-                    FirebaseFirestore db = FirebaseFirestore.getInstance();
-                    Map<String, Object> taxData = new HashMap<>();
-                    taxData.put("age", age);
-                    taxData.put("salary", salary);
-                    taxData.put("hra", hra);
-                    taxData.put("lta", lta);
-                    taxData.put("savingsDepositInterest", savingsDepositInterest);
-                    taxData.put("otherAllowances", otherAllowances);
-                    taxData.put("sec80c", sec80c);
-                    taxData.put("medInsurance", medInsurance);
-                    taxData.put("eduLoanInterest", eduLoanInterest);
-                    taxData.put("homeLoanInterest", homeLoanInterest);
-                    taxData.put("evLoanInterest", evLoanInterest);
-                    taxData.put("charityDonations", charityDonations);
-                    taxData.put("npsContributions", npsContributions);
-                    taxData.put("otherDeductions", otherDeductions);
-                    taxData.put("taxLiabilityFY22", taxLiabilityFY22);
-                    taxData.put("taxLiabilityFY23", taxLiabilityFY23);
-                    Integer totalIncome = salary + hra + lta + savingsDepositInterest + otherAllowances;
-                    taxData.put("totalTaxableIncomeFY22", totalIncome - sec80c - medInsurance - homeLoanInterest - eduLoanInterest - evLoanInterest - charityDonations - npsContributions - otherDeductions);
-                    taxData.put("totalTaxableIncomeFY23", totalIncome);
+                saveDataToFirestore(age, salary, hra, lta, savingsDepositInterest, otherAllowances, sec80c, medInsurance, homeLoanInterest, eduLoanInterest, evLoanInterest, charityDonations, npsContributions, otherDeductions, taxLiabilityFY22, taxLiabilityFY23);
+                Intent intent = new Intent(getActivity(), dashboardfragment.class);
+                intent.putExtra("taxLiabilityFY22", taxLiabilityFY22);
+                intent.putExtra("taxLiabilityFY23", taxLiabilityFY23);
 
-                    db.collection("users").document(user.getUid())
-                            .set(taxData)
-                            .addOnSuccessListener(aVoid -> Toast.makeText(getActivity(), "Data successfully written!", Toast.LENGTH_SHORT).show())
-                            .addOnFailureListener(e -> Toast.makeText(getActivity(), "Error writing document", Toast.LENGTH_SHORT).show());
-                } else {
-                    Toast.makeText(getActivity(), "No user signed in", Toast.LENGTH_SHORT).show();
-                }
 
             }
+
         });
     }
+
+    private void saveDataToFirestore(int age, int salary, int hra, int lta, int savingsDepositInterest, int otherAllowances,
+                          int sec80c, int medInsurance, int homeLoanInterest, int eduLoanInterest, int evLoanInterest,
+                          int charityDonations, int npsContributions, int otherDeductions,
+                          double taxLiabilityFY22, double taxLiabilityFY23) {
+
+        Map<String, Object> user = new HashMap<>();
+        user.put("age", age);
+        user.put("salary", salary);
+        user.put("hra", hra);
+        user.put("lta", lta);
+        user.put("savingsDepositInterest", savingsDepositInterest);
+        user.put("otherAllowances", otherAllowances);
+        user.put("sec80c", sec80c);
+        user.put("medInsurance", medInsurance);
+        user.put("homeLoanInterest", homeLoanInterest);
+        user.put("eduLoanInterest", eduLoanInterest);
+        user.put("evLoanInterest", evLoanInterest);
+        user.put("charityDonations", charityDonations);
+        user.put("npsContributions", npsContributions);
+        user.put("otherDeductions", otherDeductions);
+        user.put("taxLiabilityFY22", taxLiabilityFY22);
+        user.put("taxLiabilityFY23", taxLiabilityFY23);
+
+        if (mAuth.getCurrentUser() != null) {
+            String email = mAuth.getCurrentUser().getEmail();
+            db.collection("taxdata").document(email).set(user)
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                            Toast.makeText(getActivity(),  "Tax data successfully saved!",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            Toast.makeText(getActivity(),
+                                    "Error saving tax data.",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    });
+        }
+    }
+
+
 
 
     private double calculateTaxLiabilityFY22(int age, int salary,
@@ -217,7 +252,7 @@ public class taxtrackfragment extends Fragment {
                 taxLiability += (taxableIncome - 250000) * 0.1;
             }
         }
- else {
+        else {
             if (taxableIncome > 1000000) {
                 taxLiability += (taxableIncome - 1000000) * 0.3;
                 taxableIncome = 1000000;
@@ -327,9 +362,3 @@ public class taxtrackfragment extends Fragment {
     }
 
 }
-
-
-
-
-
-

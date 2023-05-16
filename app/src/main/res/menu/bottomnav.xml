@@ -19,8 +19,8 @@
         android:title="ITR Manager" />
     <item
         android:id="@+id/morebtn"
-        android:icon="@drawable/plus"
-        android:title="More" />
+        android:icon="@drawable/profile"
+        android:title="Settings" />
 <!--    <item-->
 <!--        android:id="@+id/dashboard"-->
 <!--        android:icon="@drawable/"-->
